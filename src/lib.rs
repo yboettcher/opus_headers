@@ -1,12 +1,6 @@
 use std::collections::HashMap;
-use std::error::Error;
 use std::io::Read;
 
-mod conversion;
-mod errors;
-
-use conversion::*;
-use errors::*;
 
 /// Both headers contained in an opus file.
 #[derive(Debug)]
@@ -42,30 +36,26 @@ pub struct CommentHeader {
     pub user_comments: HashMap<String, String>,
 }
 
-/// Reads the given amount of bytes from the Reader and returns them as Vec<u8>
-/// If anything goes wrong (reader error, amount of read bytes does not equal amount of requested bytes) an err is returned.
-/// The returned Vec always has exactly 'bytes' items.
-fn read_bytes<T: Read>(mut reader: T, bytes: usize) -> Result<Vec<u8>, Box<dyn Error>> { // const generics would be great... we would not need vec anymore 
-    let mut arr = vec![0; bytes];
-    let got = reader.read(&mut arr)?;
-    if bytes != got {
-        Err(Box::new(DidNotReadEnough { expected: bytes, got}))
-    } else {
-        Ok(arr)
-    }
+#[derive(Debug)]
+pub enum ParseError {
+    UnexpectedEOF(std::io::Error),
+    Utf8Error(std::str::Utf8Error),
+    DidNotFindHeaders
 }
 
 /// Parses a file given by a reader.
 /// Either returns the Opus Headers, or an error if anything goes wrong.
 /// This should not panic.
-pub fn parse<T: Read> (mut reader: T) -> Result<OpusHeaders, Box<dyn Error>> {
+pub fn parse<T: Read> (mut reader: T) -> Result<OpusHeaders, ParseError> {
     
     let mut ident: Option<IdentificationHeader> = None;
     let mut comment: Option<CommentHeader> = None;
     
-    while let Ok(cursor) = read_bytes(&mut reader, 1) {
-        let cursor = cursor[0];
-        let mut match_result = matches_head(cursor, &mut reader)?;
+    let mut cursor = [0; 1];
+    
+    while let Ok(()) = reader.read_exact(&mut cursor) {
+        let cursor_value = cursor[0];
+        let mut match_result = matches_head(cursor_value, &mut reader)?;
         while let OpusHeadsMatch::Retry(current) = match_result {
             match_result = matches_head(current, &mut reader)?;
         }
@@ -90,20 +80,23 @@ pub fn parse<T: Read> (mut reader: T) -> Result<OpusHeaders, Box<dyn Error>> {
     if let (Some(id), Some(co)) = (ident, comment) {
         Ok(OpusHeaders{ id, comments: co})
     } else {
-        Err(Box::new(DidNotFindBothHeaders))
+        Err(ParseError::DidNotFindHeaders)
     }
     
 }
 
 /// Parses an identification header.
 /// Returns an err if anything goes wrong.
-fn parse_identification_header<T: Read>(mut reader: T) -> Result<IdentificationHeader, Box<dyn Error>> {
-    let version = read_bytes(&mut reader, 1)?[0];
-    let channel_count = read_bytes(&mut reader, 1)?[0];
-    let pre_skip = to_u16(&read_bytes(&mut reader, 2)?);
-    let input_sample_rate = to_u32(&read_bytes(&mut reader, 4)?);
-    let output_gain = to_i16(&read_bytes(&mut reader, 2)?);
-    let channel_mapping_family = read_bytes(&mut reader, 1)?[0];
+fn parse_identification_header<T: Read>(mut reader: T) -> Result<IdentificationHeader, ParseError> {
+    let mut single_byte_buffer = [0; 1];
+    let mut double_byte_buffer = [0; 2];
+    let mut quad_byte_buffer = [0; 4];
+    let version = {reader.read_exact(&mut single_byte_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?; single_byte_buffer[0]};
+    let channel_count = {reader.read_exact(&mut single_byte_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?; single_byte_buffer[0]};
+    let pre_skip = u16::from_le_bytes({reader.read_exact(&mut double_byte_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?; double_byte_buffer});
+    let input_sample_rate = u32::from_le_bytes({reader.read_exact(&mut quad_byte_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?; quad_byte_buffer});
+    let output_gain = i16::from_le_bytes({reader.read_exact(&mut double_byte_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?; double_byte_buffer});
+    let channel_mapping_family = {reader.read_exact(&mut single_byte_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?; single_byte_buffer[0]};
 
     let channel_mapping_table = if channel_mapping_family != 0 {
         Some(parse_channel_mapping_table(&mut reader)?)
@@ -124,10 +117,12 @@ fn parse_identification_header<T: Read>(mut reader: T) -> Result<IdentificationH
 
 /// parses a channel mapping table.
 /// returns an err if anything goes wrong.
-fn parse_channel_mapping_table<T: Read>(mut reader: T) -> Result<ChannelMappingTable, Box<dyn Error>> {
-    let stream_count = read_bytes(&mut reader, 1)?[0];
-    let coupled_stream_count = read_bytes(&mut reader, 1)?[0];
-    let channel_mapping = read_bytes(&mut reader, stream_count as usize)?;
+fn parse_channel_mapping_table<T: Read>(mut reader: T) -> Result<ChannelMappingTable, ParseError> {
+    let mut single_byte_buffer = [0; 1];
+    let stream_count = {reader.read_exact(&mut single_byte_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?; single_byte_buffer[0]};
+    let coupled_stream_count = {reader.read_exact(&mut single_byte_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?; single_byte_buffer[0]};
+    let mut channel_mapping = vec![0; stream_count as usize];
+    reader.read_exact(&mut channel_mapping).map_err(|e| ParseError::UnexpectedEOF(e))?;
     
     Ok(ChannelMappingTable {
         stream_count,
@@ -139,18 +134,22 @@ fn parse_channel_mapping_table<T: Read>(mut reader: T) -> Result<ChannelMappingT
 /// parses the comment header.
 /// returns an err if anything goes wrong.
 /// if a comment cannot be split into two parts by splitting at '=', the comment is ignored
-fn parse_comment_header<T: Read>(mut reader: T) -> Result<CommentHeader, Box<dyn Error>> {
-    let vlen = to_u32(&read_bytes(&mut reader, 4)?);
-    let vstr_bytes = read_bytes(&mut reader, vlen as usize)?;
-    let vstr = std::str::from_utf8(&vstr_bytes)?;
+fn parse_comment_header<T: Read>(mut reader: T) -> Result<CommentHeader, ParseError> {
+    let mut quad_byte_buffer = [0; 4];
+    
+    let vlen = u32::from_le_bytes({reader.read_exact(&mut quad_byte_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?; quad_byte_buffer});
+    let mut vstr_buffer = vec![0; vlen as usize];
+    reader.read_exact(&mut vstr_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?;
+    let vstr = std::str::from_utf8(&vstr_buffer).map_err(|e| ParseError::Utf8Error(e))?;
 
     let mut comments = HashMap::new();
-    let commentlistlen = to_u32(&read_bytes(&mut reader, 4)?);
+    let commentlistlen = u32::from_le_bytes({reader.read_exact(&mut quad_byte_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?; quad_byte_buffer});
 
     for _i in 0..commentlistlen {
-        let commentlen = to_u32(&read_bytes(&mut reader, 4)?);
-        let commentstr = read_bytes(&mut reader, commentlen as usize)?;
-        let commentstr = std::str::from_utf8(&commentstr)?;
+        let commentlen = u32::from_le_bytes({reader.read_exact(&mut quad_byte_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?; quad_byte_buffer});
+        let mut comment_buffer = vec![0; commentlen as usize];
+        reader.read_exact(&mut comment_buffer).map_err(|e| ParseError::UnexpectedEOF(e))?;
+        let commentstr = std::str::from_utf8(&comment_buffer).map_err(|e| ParseError::Utf8Error(e))?;
         let parts: Vec<_> = commentstr.splitn(2, "=").collect();
         if parts.len() == 2 {
             comments.insert(parts[0].to_string(), parts[1].to_string());
@@ -177,36 +176,36 @@ enum OpusHeadsMatch {
 
 /// incrementally parses the magic numbers of the identification and comment header.
 /// if any byte does not match, we either return none, as this is clearly not any header, or, if the byte is 0x4f, we return that byte (which is why we always have to save it in a 'next' variable) and tell the caller to try again
-fn matches_head<T: Read>(current: u8, mut reader: T) -> Result<OpusHeadsMatch, Box<dyn Error>> {
+fn matches_head<T: Read>(current: u8, mut reader: T) -> Result<OpusHeadsMatch, ParseError> {
     // There is probably a dozen better ways to do this, but this works
-    let mut next = 0;
+    let mut next = [0; 1];
     if current == 0x4f {
-        next = read_bytes(&mut reader, 1)?[0];
-        if next == 0x70 {
-            next = read_bytes(&mut reader, 1)?[0];
-            if next == 0x75 {
-                next = read_bytes(&mut reader, 1)?[0];
-                if next == 0x73 {
-                    next = read_bytes(&mut reader, 1)?[0];
-                    if next == 0x48 {
-                        next = read_bytes(&mut reader, 1)?[0];
-                        if next == 0x65 {
-                            next = read_bytes(&mut reader, 1)?[0];
-                            if next == 0x61 {
-                                next = read_bytes(&mut reader, 1)?[0];
-                                if next == 0x64 {
+        reader.read_exact(&mut next).map_err(|e| ParseError::UnexpectedEOF(e))?;
+        if next[0] == 0x70 {
+            reader.read_exact(&mut next).map_err(|e| ParseError::UnexpectedEOF(e))?;
+            if next[0] == 0x75 {
+                reader.read_exact(&mut next).map_err(|e| ParseError::UnexpectedEOF(e))?;
+                if next[0] == 0x73 {
+                    reader.read_exact(&mut next).map_err(|e| ParseError::UnexpectedEOF(e))?;
+                    if next[0] == 0x48 {
+                        reader.read_exact(&mut next).map_err(|e| ParseError::UnexpectedEOF(e))?;
+                        if next[0] == 0x65 {
+                            reader.read_exact(&mut next).map_err(|e| ParseError::UnexpectedEOF(e))?;
+                            if next[0] == 0x61 {
+                                reader.read_exact(&mut next).map_err(|e| ParseError::UnexpectedEOF(e))?;
+                                if next[0] == 0x64 {
                                     return Ok(OpusHeadsMatch::Ident);
                                 }
                             }
                         }
                     } else {
-                        if next == 0x54 {
-                            next = read_bytes(&mut reader, 1)?[0];
-                            if next == 0x61 {
-                                next = read_bytes(&mut reader, 1)?[0];
-                                if next == 0x67 {
-                                    next = read_bytes(&mut reader, 1)?[0];
-                                    if next == 0x73 {
+                        if next[0] == 0x54 {
+                            reader.read_exact(&mut next).map_err(|e| ParseError::UnexpectedEOF(e))?;
+                            if next[0] == 0x61 {
+                                reader.read_exact(&mut next).map_err(|e| ParseError::UnexpectedEOF(e))?;
+                                if next[0] == 0x67 {
+                                    reader.read_exact(&mut next).map_err(|e| ParseError::UnexpectedEOF(e))?;
+                                    if next[0] == 0x73 {
                                         return Ok(OpusHeadsMatch::Comment);
                                     }
                                 }
@@ -217,8 +216,8 @@ fn matches_head<T: Read>(current: u8, mut reader: T) -> Result<OpusHeadsMatch, B
             }
         }
     }
-    if next == 0x4f {
-        return Ok(OpusHeadsMatch::Retry(next));
+    if next[0] == 0x4f {
+        return Ok(OpusHeadsMatch::Retry(next[0]));
     }
     return Ok(OpusHeadsMatch::None);
 }
