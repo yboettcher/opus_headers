@@ -67,10 +67,10 @@ pub fn parse<T: Read> (mut reader: T) -> Result<OpusHeaders, Box<dyn Error>> {
         }
         
         match match_result {
-            OpusHeadsMatch::Header => {
+            OpusHeadsMatch::Ident => {
                 ident = Some(parse_identification_header(&mut reader)?);
             }
-            OpusHeadsMatch::Tags => {
+            OpusHeadsMatch::Comment => {
                 comment = Some(parse_comment_header(&mut reader)?);
             }
             _ => {

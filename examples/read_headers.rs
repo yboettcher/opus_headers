@@ -1,8 +1,8 @@
-extern crate opus_parse;
+extern crate opus_headers;
 
 use std::io::BufReader;
 use std::fs::File;
-use opus_parse::parse;
+use opus_headers::parse;
 
 fn main() {
     let f = File::open(format!("{}/examples/silence.opus", env!("CARGO_MANIFEST_DIR"))).unwrap();
