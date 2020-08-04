@@ -83,44 +83,42 @@ pub fn parse<T: Read>(mut reader: T) -> Result<OpusHeaders, ParseError> {
 /// Parses an identification header.
 /// Returns an err if anything goes wrong.
 fn parse_identification_header<T: Read>(mut reader: T) -> Result<IdentificationHeader, ParseError> {
-    let mut single_byte_buffer = [0; 1];
-    let mut double_byte_buffer = [0; 2];
-    let mut quad_byte_buffer = [0; 4];
+    let mut buf = [0; 4];
     let version = {
         reader
-            .read_exact(&mut single_byte_buffer)
+            .read_exact(&mut buf[0..1])
             .map_err(|e| ParseError::UnexpectedEOF(e))?;
-        single_byte_buffer[0]
+        buf[0]
     };
     let channel_count = {
         reader
-            .read_exact(&mut single_byte_buffer)
+            .read_exact(&mut buf[0..1])
             .map_err(|e| ParseError::UnexpectedEOF(e))?;
-        single_byte_buffer[0]
+        buf[0]
     };
     let pre_skip = u16::from_le_bytes({
         reader
-            .read_exact(&mut double_byte_buffer)
+            .read_exact(&mut buf[0..2])
             .map_err(|e| ParseError::UnexpectedEOF(e))?;
-        double_byte_buffer
+        [buf[0], buf[1]]
     });
     let input_sample_rate = u32::from_le_bytes({
         reader
-            .read_exact(&mut quad_byte_buffer)
+            .read_exact(&mut buf)
             .map_err(|e| ParseError::UnexpectedEOF(e))?;
-        quad_byte_buffer
+        buf
     });
     let output_gain = i16::from_le_bytes({
         reader
-            .read_exact(&mut double_byte_buffer)
+            .read_exact(&mut buf[0..2])
             .map_err(|e| ParseError::UnexpectedEOF(e))?;
-        double_byte_buffer
+        [buf[0], buf[1]]
     });
     let channel_mapping_family = {
         reader
-            .read_exact(&mut single_byte_buffer)
+            .read_exact(&mut buf[0..1])
             .map_err(|e| ParseError::UnexpectedEOF(e))?;
-        single_byte_buffer[0]
+        buf[0]
     };
 
     let channel_mapping_table = if channel_mapping_family != 0 {
@@ -143,18 +141,18 @@ fn parse_identification_header<T: Read>(mut reader: T) -> Result<IdentificationH
 /// parses a channel mapping table.
 /// returns an err if anything goes wrong.
 fn parse_channel_mapping_table<T: Read>(mut reader: T) -> Result<ChannelMappingTable, ParseError> {
-    let mut single_byte_buffer = [0; 1];
+    let mut buf = [0; 1];
     let stream_count = {
         reader
-            .read_exact(&mut single_byte_buffer)
+            .read_exact(&mut buf)
             .map_err(|e| ParseError::UnexpectedEOF(e))?;
-        single_byte_buffer[0]
+        buf[0]
     };
     let coupled_stream_count = {
         reader
-            .read_exact(&mut single_byte_buffer)
+            .read_exact(&mut buf)
             .map_err(|e| ParseError::UnexpectedEOF(e))?;
-        single_byte_buffer[0]
+        buf[0]
     };
     let mut channel_mapping = vec![0; stream_count as usize];
     reader
@@ -172,13 +170,13 @@ fn parse_channel_mapping_table<T: Read>(mut reader: T) -> Result<ChannelMappingT
 /// returns an err if anything goes wrong.
 /// if a comment cannot be split into two parts by splitting at '=', the comment is ignored
 fn parse_comment_header<T: Read>(mut reader: T) -> Result<CommentHeader, ParseError> {
-    let mut quad_byte_buffer = [0; 4];
+    let mut buf = [0; 4];
 
     let vlen = u32::from_le_bytes({
         reader
-            .read_exact(&mut quad_byte_buffer)
+            .read_exact(&mut buf)
             .map_err(|e| ParseError::UnexpectedEOF(e))?;
-        quad_byte_buffer
+        buf
     });
     let mut vstr_buffer = vec![0; vlen as usize];
     reader
@@ -189,17 +187,17 @@ fn parse_comment_header<T: Read>(mut reader: T) -> Result<CommentHeader, ParseEr
     let mut comments = HashMap::new();
     let commentlistlen = u32::from_le_bytes({
         reader
-            .read_exact(&mut quad_byte_buffer)
+            .read_exact(&mut buf)
             .map_err(|e| ParseError::UnexpectedEOF(e))?;
-        quad_byte_buffer
+        buf
     });
 
     for _i in 0..commentlistlen {
         let commentlen = u32::from_le_bytes({
             reader
-                .read_exact(&mut quad_byte_buffer)
+                .read_exact(&mut buf)
                 .map_err(|e| ParseError::UnexpectedEOF(e))?;
-            quad_byte_buffer
+            buf
         });
         let mut comment_buffer = vec![0; commentlen as usize];
         reader
