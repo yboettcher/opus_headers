@@ -8,12 +8,14 @@ mod errors;
 use conversion::*;
 use errors::*;
 
+/// Both headers contained in an opus file.
 #[derive(Debug)]
 pub struct OpusHeaders {
     pub id: IdentificationHeader,
     pub comments: CommentHeader,
 }
 
+/// The identification header.
 #[derive(Debug)]
 pub struct IdentificationHeader {
     pub version: u8,
@@ -25,6 +27,7 @@ pub struct IdentificationHeader {
     pub channel_mapping_table: Option<ChannelMappingTable>,
 }
 
+/// This part is optionally included in the IdentificationHeader
 #[derive(Debug)]
 pub struct ChannelMappingTable {
     pub stream_count: u8,
@@ -32,6 +35,7 @@ pub struct ChannelMappingTable {
     pub channel_mapping: Vec<u8>,
 }
 
+/// The Comment header containing a vendor string and the user comments as a map.
 #[derive(Debug)]
 pub struct CommentHeader {
     pub vendor: String,
@@ -171,9 +175,10 @@ enum OpusHeadsMatch {
     Retry(u8)
 }
 
-// incrementally parses the magic numbers of the identification and comment header.
-// if any byte does not match, we either return none, as this is clearly not any header, or, if the byte is 0x4f, we return that byte (which is why we always have to save it in a 'next' variable) and tell the caller to try again
+/// incrementally parses the magic numbers of the identification and comment header.
+/// if any byte does not match, we either return none, as this is clearly not any header, or, if the byte is 0x4f, we return that byte (which is why we always have to save it in a 'next' variable) and tell the caller to try again
 fn matches_head<T: Read>(current: u8, mut reader: T) -> Result<OpusHeadsMatch, Box<dyn Error>> {
+    // There is probably a dozen better ways to do this, but this works
     let mut next = 0;
     if current == 0x4f {
         next = read_bytes(&mut reader, 1)?[0];
