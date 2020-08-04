@@ -1,39 +1,46 @@
-use std::io::Read;
-use std::io::BufReader;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt;
+use std::io::Read;
 
-fn main() {
-    let f = std::fs::File::open("/mnt/sshfs_asus_yannik/Musik/out.opus").unwrap();
-    let mut reader = BufReader::new(f);
-    
-    
-    let headers = parse(&mut reader).unwrap();
-    println!("{:?}", headers);
+mod conversion;
+mod errors;
+
+use conversion::*;
+use errors::*;
+
+#[derive(Debug)]
+pub struct OpusHeaders {
+    pub id: IdentificationHeader,
+    pub comments: CommentHeader,
 }
 
 #[derive(Debug)]
-pub struct DidNotReadEnough {
-    expected: usize,
-    got: usize
-}
-impl Error for DidNotReadEnough {}
-impl fmt::Display for DidNotReadEnough {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", format!("Only read {} bytes, expected {}", self.got, self.expected))
-    }
+pub struct IdentificationHeader {
+    pub version: u8,
+    pub channel_count: u8,
+    pub pre_skip: u16,
+    pub input_sample_rate: u32,
+    pub output_gain: i16,
+    pub channel_mapping_family: u8,
+    pub channel_mapping_table: Option<ChannelMappingTable>,
 }
 
 #[derive(Debug)]
-pub struct DidNotFindBothHeaders;
-impl Error for DidNotFindBothHeaders {}
-impl fmt::Display for DidNotFindBothHeaders {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Could not find either the identification or comment header in the given Reader")
-    }
+pub struct ChannelMappingTable {
+    pub stream_count: u8,
+    pub coupled_stream_count: u8,
+    pub channel_mapping: Vec<u8>,
 }
 
+#[derive(Debug)]
+pub struct CommentHeader {
+    pub vendor: String,
+    pub user_comments: HashMap<String, String>,
+}
+
+/// Reads the given amount of bytes from the Reader and returns them as Vec<u8>
+/// If anything goes wrong (reader error, amount of read bytes does not equal amount of requested bytes) an err is returned.
+/// The returned Vec always has exactly 'bytes' items.
 fn read_bytes<T: Read>(mut reader: T, bytes: usize) -> Result<Vec<u8>, Box<dyn Error>> { // const generics would be great... we would not need vec anymore 
     let mut arr = vec![0; bytes];
     let got = reader.read(&mut arr)?;
@@ -44,49 +51,9 @@ fn read_bytes<T: Read>(mut reader: T, bytes: usize) -> Result<Vec<u8>, Box<dyn E
     }
 }
 
-// small wrappers
-fn to_u16(bytes: &[u8]) -> u16 {
-    u16::from_le_bytes([bytes[0], bytes[1]])
-}
-
-fn to_u32(bytes: &[u8]) -> u32 {
-    u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]])
-}
-
-fn to_i16(bytes: &[u8]) -> i16 {
-    i16::from_le_bytes([bytes[0], bytes[1]])
-}
-
-#[derive(Debug)]
-pub struct OpusHeaders {
-    id: IdentificationHeader,
-    comments: CommentHeader,
-}
-
-#[derive(Debug)]
-pub struct IdentificationHeader {
-    version: u8,
-    channel_count: u8,
-    pre_skip: u16,
-    input_sample_rate: u32,
-    output_gain: i16,
-    channel_mapping_family: u8,
-    channel_mapping_table: Option<ChannelMappingTable>,
-}
-
-#[derive(Debug)]
-pub struct ChannelMappingTable {
-    stream_count: u8,
-    coupled_stream_count: u8,
-    channel_mapping: Vec<u8>,
-}
-
-#[derive(Debug)]
-pub struct CommentHeader {
-    vendor: String,
-    user_comments: HashMap<String, String>,
-}
-
+/// Parses a file given by a reader.
+/// Either returns the Opus Headers, or an error if anything goes wrong.
+/// This should not panic.
 pub fn parse<T: Read> (mut reader: T) -> Result<OpusHeaders, Box<dyn Error>> {
     
     let mut ident: Option<IdentificationHeader> = None;
@@ -124,6 +91,8 @@ pub fn parse<T: Read> (mut reader: T) -> Result<OpusHeaders, Box<dyn Error>> {
     
 }
 
+/// Parses an identification header.
+/// Returns an err if anything goes wrong.
 fn parse_identification_header<T: Read>(mut reader: T) -> Result<IdentificationHeader, Box<dyn Error>> {
     let version = read_bytes(&mut reader, 1)?[0];
     let channel_count = read_bytes(&mut reader, 1)?[0];
@@ -149,6 +118,8 @@ fn parse_identification_header<T: Read>(mut reader: T) -> Result<IdentificationH
     })
 }
 
+/// parses a channel mapping table.
+/// returns an err if anything goes wrong.
 fn parse_channel_mapping_table<T: Read>(mut reader: T) -> Result<ChannelMappingTable, Box<dyn Error>> {
     let stream_count = read_bytes(&mut reader, 1)?[0];
     let coupled_stream_count = read_bytes(&mut reader, 1)?[0];
@@ -161,6 +132,9 @@ fn parse_channel_mapping_table<T: Read>(mut reader: T) -> Result<ChannelMappingT
     })
 }
 
+/// parses the comment header.
+/// returns an err if anything goes wrong.
+/// if a comment cannot be split into two parts by splitting at '=', the comment is ignored
 fn parse_comment_header<T: Read>(mut reader: T) -> Result<CommentHeader, Box<dyn Error>> {
     let vlen = to_u32(&read_bytes(&mut reader, 4)?);
     let vstr_bytes = read_bytes(&mut reader, vlen as usize)?;
@@ -185,17 +159,21 @@ fn parse_comment_header<T: Read>(mut reader: T) -> Result<CommentHeader, Box<dyn
     })
 }
 
+/// Used to signal the result of the head match
+/// None: This does not match any head,
+/// Ident: This matches the identification header magic number
+/// Comment: This matches the comment header magic number
+/// Retry(u8): We found another 0x4f byte. In this case, we did not find any header, but the 0x4f might be the start of the actual header.
 enum OpusHeadsMatch {
     None,
-    Header,
-    Tags,
+    Ident,
+    Comment,
     Retry(u8)
 }
 
+// incrementally parses the magic numbers of the identification and comment header.
+// if any byte does not match, we either return none, as this is clearly not any header, or, if the byte is 0x4f, we return that byte (which is why we always have to save it in a 'next' variable) and tell the caller to try again
 fn matches_head<T: Read>(current: u8, mut reader: T) -> Result<OpusHeadsMatch, Box<dyn Error>> {
-    // incrementally parses the magic numbers of the identification and comment header.
-    // if any byte does not match, we return that byte (which is why we always have to save it in a 'next' variable) and tell the caller to try again
-    
     let mut next = 0;
     if current == 0x4f {
         next = read_bytes(&mut reader, 1)?[0];
@@ -212,7 +190,7 @@ fn matches_head<T: Read>(current: u8, mut reader: T) -> Result<OpusHeadsMatch, B
                             if next == 0x61 {
                                 next = read_bytes(&mut reader, 1)?[0];
                                 if next == 0x64 {
-                                    return Ok(OpusHeadsMatch::Header);
+                                    return Ok(OpusHeadsMatch::Ident);
                                 }
                             }
                         }
@@ -224,7 +202,7 @@ fn matches_head<T: Read>(current: u8, mut reader: T) -> Result<OpusHeadsMatch, B
                                 if next == 0x67 {
                                     next = read_bytes(&mut reader, 1)?[0];
                                     if next == 0x73 {
-                                        return Ok(OpusHeadsMatch::Tags);
+                                        return Ok(OpusHeadsMatch::Comment);
                                     }
                                 }
                             }
