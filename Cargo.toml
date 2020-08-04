@@ -1,5 +1,5 @@
 [package]
-name = "opus_parse"
+name = "opus_headers"
 version = "0.1.0"
 authors = ["Yannik Böttcher <yannikboettcher@outlook.de>"]
 edition = "2018"
