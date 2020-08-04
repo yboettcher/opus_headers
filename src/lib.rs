@@ -66,12 +66,12 @@ struct OggPage {
     pub page_segments: u8,
     pub segment_table: Vec<u8>, // contains the amount of bytes of payload: bytes = sum(segment_table_entries)
     // payload: Vec<u8> // if we want to check the CRC, we should keep the original Payload
-    pub payload: OggPayload
+    pub payload: OggPayload,
 }
 
 pub enum OggPayload {
     IdentificationHeader(IdentificationHeader),
-    CommentHeader(CommentHeader)
+    CommentHeader(CommentHeader),
 }
 
 /// Parses a file given by a reader.
@@ -79,7 +79,7 @@ pub enum OggPayload {
 /// This should not panic.
 pub fn parse<T: Read>(mut reader: T) -> Result<OpusHeaders, ParseError> {
     let mut ogg_magic = [0; 4];
-    
+
     // test ogg magic and read first page
     reader.read_exact(&mut ogg_magic)?;
     if ogg_magic != [0x4f, 0x67, 0x67, 0x53] {
@@ -93,20 +93,19 @@ pub fn parse<T: Read>(mut reader: T) -> Result<OpusHeaders, ParseError> {
         return Err(ParseError::InvalidOggPage);
     }
     let second_ogg_page = parse_ogg_page(&mut reader)?;
-    
+
     // test ogg magic after second page (sanity check)
     reader.read_exact(&mut ogg_magic)?;
     if ogg_magic != [0x4f, 0x67, 0x67, 0x53] {
         return Err(ParseError::InvalidOggPage);
     }
-    
-    if let (OggPayload::IdentificationHeader(id), OggPayload::CommentHeader(co)) = (first_ogg_page.payload, second_ogg_page.payload) {
-        return Ok(OpusHeaders {
-            id,
-            comments: co
-        });
+
+    if let (OggPayload::IdentificationHeader(id), OggPayload::CommentHeader(co)) =
+        (first_ogg_page.payload, second_ogg_page.payload)
+    {
+        return Ok(OpusHeaders { id, comments: co });
     }
-    
+
     return Err(ParseError::DidNotFindHeaders);
 }
 
@@ -145,14 +144,14 @@ fn parse_ogg_page<T: Read>(mut reader: T) -> Result<OggPage, ParseError> {
         reader.read_exact(&mut segment_table_bytes)?;
         segment_table_bytes
     };
-    
+
     let mut opus_magic = [0; 8];
     reader.read_exact(&mut opus_magic)?;
-    
+
     // first packet, parse the identification header
     if header_type == 0x02 && opus_magic == [0x4f, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64] {
         let identification_header = parse_identification_header(&mut reader)?;
-        return Ok(OggPage{
+        return Ok(OggPage {
             version,
             header_type,
             granule_position,
@@ -161,14 +160,14 @@ fn parse_ogg_page<T: Read>(mut reader: T) -> Result<OggPage, ParseError> {
             crc_checksum,
             page_segments,
             segment_table,
-            payload: OggPayload::IdentificationHeader(identification_header)
+            payload: OggPayload::IdentificationHeader(identification_header),
         });
     }
-    
+
     // not the first packet -> second packet, parse the comment header
     if header_type == 0x00 && opus_magic == [0x4f, 0x70, 0x75, 0x73, 0x54, 0x61, 0x67, 0x73] {
         let comment_header = parse_comment_header(&mut reader)?;
-        return Ok(OggPage{
+        return Ok(OggPage {
             version,
             header_type,
             granule_position,
@@ -177,10 +176,10 @@ fn parse_ogg_page<T: Read>(mut reader: T) -> Result<OggPage, ParseError> {
             crc_checksum,
             page_segments,
             segment_table,
-            payload: OggPayload::CommentHeader(comment_header)
+            payload: OggPayload::CommentHeader(comment_header),
         });
     }
-    
+
     return Err(ParseError::InvalidOggPage);
 }
 
@@ -279,8 +278,7 @@ fn parse_comment_header<T: Read>(mut reader: T) -> Result<CommentHeader, ParseEr
         });
         let mut comment_buffer = vec![0; commentlen as usize];
         reader.read_exact(&mut comment_buffer)?;
-        let commentstr =
-            std::str::from_utf8(&comment_buffer)?;
+        let commentstr = std::str::from_utf8(&comment_buffer)?;
         let parts: Vec<_> = commentstr.splitn(2, "=").collect();
         if parts.len() == 2 {
             comments.insert(parts[0].to_string(), parts[1].to_string());
