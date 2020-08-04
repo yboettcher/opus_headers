@@ -62,7 +62,7 @@ struct OggPage {
     pub granule_position: i64,
     pub bitstream_serial_number: u32,
     pub page_sequence_number: u32,
-    pub CRC_checksum: u32,
+    pub crc_checksum: u32,
     pub page_segments: u8,
     pub segment_table: Vec<u8>, // contains the amount of bytes of payload: bytes = sum(segment_table_entries)
     // payload: Vec<u8> // if we want to check the CRC, we should keep the original Payload
@@ -78,11 +78,6 @@ pub enum OggPayload {
 /// Either returns the Opus Headers, or an error if anything goes wrong.
 /// This should not panic.
 pub fn parse<T: Read>(mut reader: T) -> Result<OpusHeaders, ParseError> {
-    let mut ident: Option<IdentificationHeader> = None;
-    let mut comment: Option<CommentHeader> = None;
-
-    let mut cursor = [0; 1];
-
     let mut ogg_magic = [0; 4];
     
     // test ogg magic and read first page
@@ -137,7 +132,7 @@ fn parse_ogg_page<T: Read>(mut reader: T) -> Result<OggPage, ParseError> {
         reader.read_exact(&mut buf[0..4])?;
         [buf[0], buf[1], buf[2], buf[3]]
     });
-    let CRC_checksum = u32::from_le_bytes({
+    let crc_checksum = u32::from_le_bytes({
         reader.read_exact(&mut buf[0..4])?;
         [buf[0], buf[1], buf[2], buf[3]]
     });
@@ -163,7 +158,7 @@ fn parse_ogg_page<T: Read>(mut reader: T) -> Result<OggPage, ParseError> {
             granule_position,
             bitstream_serial_number,
             page_sequence_number,
-            CRC_checksum,
+            crc_checksum,
             page_segments,
             segment_table,
             payload: OggPayload::IdentificationHeader(identification_header)
@@ -179,7 +174,7 @@ fn parse_ogg_page<T: Read>(mut reader: T) -> Result<OggPage, ParseError> {
             granule_position,
             bitstream_serial_number,
             page_sequence_number,
-            CRC_checksum,
+            crc_checksum,
             page_segments,
             segment_table,
             payload: OggPayload::CommentHeader(comment_header)
@@ -296,66 +291,4 @@ fn parse_comment_header<T: Read>(mut reader: T) -> Result<CommentHeader, ParseEr
         vendor: vstr.to_string(),
         user_comments: comments,
     })
-}
-
-/// Used to signal the result of the head match
-/// None: This does not match any head,
-/// Ident: This matches the identification header magic number
-/// Comment: This matches the comment header magic number
-/// Retry(u8): We found another 0x4f byte. In this case, we did not find any header, but the 0x4f might be the start of the actual header.
-enum OpusHeadsMatch {
-    None,
-    Ident,
-    Comment,
-    Retry(u8),
-}
-
-/// incrementally parses the magic numbers of the identification and comment header.
-/// if any byte does not match, we either return none, as this is clearly not any header, or, if the byte is 0x4f, we return that byte (which is why we always have to save it in a 'next' variable) and tell the caller to try again
-fn matches_head<T: Read>(current: u8, mut reader: T) -> Result<OpusHeadsMatch, ParseError> {
-    // There is probably a dozen better ways to do this, but this works
-    let mut next = [0; 1];
-    
-    
-    if current == 0x4f {
-        reader.read_exact(&mut next)?;
-        if next[0] == 0x70 {
-            reader.read_exact(&mut next)?;
-            if next[0] == 0x75 {
-                reader.read_exact(&mut next)?;
-                if next[0] == 0x73 {
-                    reader.read_exact(&mut next)?;
-                    if next[0] == 0x48 {
-                        reader.read_exact(&mut next)?;
-                        if next[0] == 0x65 {
-                            reader.read_exact(&mut next)?;
-                            if next[0] == 0x61 {
-                                reader.read_exact(&mut next)?;
-                                if next[0] == 0x64 {
-                                    return Ok(OpusHeadsMatch::Ident);
-                                }
-                            }
-                        }
-                    } else {
-                        if next[0] == 0x54 {
-                            reader.read_exact(&mut next)?;
-                            if next[0] == 0x61 {
-                                reader.read_exact(&mut next)?;
-                                if next[0] == 0x67 {
-                                    reader.read_exact(&mut next)?;
-                                    if next[0] == 0x73 {
-                                        return Ok(OpusHeadsMatch::Comment);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if next[0] == 0x4f {
-        return Ok(OpusHeadsMatch::Retry(next[0]));
-    }
-    return Ok(OpusHeadsMatch::None);
 }
