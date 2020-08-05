@@ -1,7 +1,13 @@
 use std::collections::HashMap;
-use std::error;
-use std::io::{self, Read};
-use std::str;
+use std::io::Read;
+use std::result;
+
+pub use error::ParseError;
+
+mod error;
+
+/// A specialized [`Result`][std::result::Result] type for the fallible functions.
+pub type Result<T, E = ParseError> = result::Result<T, E>;
 
 /// Both headers contained in an opus file.
 #[derive(Debug)]
@@ -37,47 +43,6 @@ pub struct CommentHeader {
     pub user_comments: HashMap<String, String>,
 }
 
-#[derive(Debug)]
-pub enum ParseError {
-    Io(io::Error),
-    Encoding(str::Utf8Error),
-    InvalidOggPage,
-    DidNotFindHeaders,
-}
-
-impl From<io::Error> for ParseError {
-    fn from(e: io::Error) -> Self {
-        Self::Io(e)
-    }
-}
-
-impl From<str::Utf8Error> for ParseError {
-    fn from(e: str::Utf8Error) -> Self {
-        Self::Encoding(e)
-    }
-}
-
-impl error::Error for ParseError {
-    fn cause(&self) -> Option<&dyn error::Error> {
-        match self {
-            ParseError::Io(e) => Some(e),
-            ParseError::Encoding(e) => Some(e),
-            ParseError::InvalidOggPage => None,
-            ParseError::DidNotFindHeaders => None,
-        }
-    }
-}
-
-impl std::fmt::Display for ParseError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ParseError::Io(e) => e.fmt(f),
-            ParseError::Encoding(e) => e.fmt(f),
-            ParseError::InvalidOggPage => f.write_str("missing Ogg page magic"),
-            ParseError::DidNotFindHeaders => f.write_str("missing Opus headers"),
-        }
-    }
-}
 struct OggPage {
     pub version: u8,
     pub header_type: u8,
@@ -128,7 +93,7 @@ pub fn parse<T: Read>(mut reader: T) -> Result<OpusHeaders, ParseError> {
         return Ok(OpusHeaders { id, comments: co });
     }
 
-    return Err(ParseError::DidNotFindHeaders);
+    Err(ParseError::DidNotFindHeaders)
 }
 
 fn parse_ogg_page<T: Read>(mut reader: T) -> Result<OggPage, ParseError> {
