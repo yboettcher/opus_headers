@@ -1,17 +1,12 @@
-extern crate opus_headers;
-
-use opus_headers::parse_from_read;
-use std::fs::File;
-use std::io::BufReader;
+use std::path::Path;
+use opus_headers::parse_from_path; // or parse_from_read or parse_from_file
 
 fn main() {
-    let f = File::open(format!(
-        "{}/examples/silence.opus",
-        env!("CARGO_MANIFEST_DIR")
-    ))
-    .unwrap();
-    let mut reader = BufReader::new(f);
+    let path = Path::new("examples/silence.opus");
+    let headers = parse_from_path(path).unwrap();
 
-    let headers = parse_from_read(&mut reader).unwrap();
-    println!("{:#?}", headers);
+    let comments = headers.comments.user_comments;
+    for (tag, value) in &comments {
+        println!("{}: {}", tag, value);
+    }
 }

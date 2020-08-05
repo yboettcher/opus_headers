@@ -56,7 +56,7 @@ fn test_malformed_file_2() {
     let path = Path::new("test/silence_malformed_wrong_length_too_long.opus");
     let headers = parse_from_path(path);
     
-    if let Err(ParseError::Io(e)) = headers {
+    if let Err(ParseError::Io(_e)) = headers {
         return;
     }
     
@@ -71,7 +71,22 @@ fn test_malformed_file_3() {
     let path = Path::new("test/silence_malformed_wrong_length_too_short.opus");
     let headers = parse_from_path(path);
     
-    if let Err(ParseError::Io(e)) = headers {
+    if let Err(ParseError::Io(_e)) = headers {
+        return;
+    }
+    
+    println!("{:#?}", headers.unwrap());
+    
+    panic!("this file should not be accepted");
+}
+
+
+#[test]
+fn test_non_existing_file() {
+    let path = Path::new("test/not_found.opus");
+    let headers = parse_from_path(path);
+    
+    if let Err(ParseError::Io(_e)) = headers {
         return;
     }
     
