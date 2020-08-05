@@ -55,7 +55,8 @@ pub fn parse_from_read<T: Read>(mut reader: T) -> Result<OpusHeaders> {
         }
     }
 
-    let mut comment_bytes: Vec<u8> = vec![];
+    let comment_len = comment_pages.iter().map(|p| p.payload.len()).sum();
+    let mut comment_bytes = Vec::with_capacity(comment_len);
 
     for mut page in comment_pages {
         comment_bytes.append(&mut page.payload);
