@@ -12,13 +12,7 @@ pub(crate) struct OggPage {
     pub page_segments: u8,
     pub segment_table: Vec<u8>, // contains the amount of bytes of payload: bytes = sum(segment_table_entries)
     pub payload: Vec<u8>
-    // pub payload: OggPayload,
 }
-
-pub(crate) enum OggPayload {
-    IdentificationHeader(IdentificationHeader),
-    CommentHeader(CommentHeader),
-} 
 
 impl OggPage {
     pub(crate) fn parse<T: Read>(mut reader: T) -> Result<OggPage, ParseError> {
