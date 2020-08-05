@@ -1,15 +1,10 @@
 use std::io::Read;
-use std::result;
 
 pub use error::ParseError;
-
-use read_ext::ReadExt;
+pub use error::Result;
 
 mod error;
 mod read_ext;
-
-/// A specialized [`Result`][std::result::Result] type for the fallible functions.
-pub type Result<T, E = ParseError> = result::Result<T, E>;
 
 mod opus_header_structs;
 use opus_header_structs::*;
@@ -27,7 +22,7 @@ pub struct OpusHeaders {
 /// Parses a file given by a reader.
 /// Either returns the Opus Headers, or an error if anything goes wrong.
 /// This should not panic.
-pub fn parse<T: Read>(mut reader: T) -> Result<OpusHeaders, ParseError> {
+pub fn parse<T: Read>(mut reader: T) -> Result<OpusHeaders> {
     let first_ogg_page = OggPage::parse(&mut reader)?;
 
     let id = IdentificationHeader::parse(&first_ogg_page.payload[..])?;

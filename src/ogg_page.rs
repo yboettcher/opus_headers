@@ -1,4 +1,5 @@
-use crate::parse_error::*;
+use crate::error::{ParseError, Result};
+use crate::read_ext::ReadExt;
 use std::io::Read;
 
 pub(crate) struct OggPage {
@@ -14,44 +15,22 @@ pub(crate) struct OggPage {
 }
 
 impl OggPage {
-    pub(crate) fn parse<T: Read>(mut reader: T) -> Result<OggPage, ParseError> {
+    pub(crate) fn parse<T: Read>(mut reader: T) -> Result<OggPage> {
         let mut ogg_magic = [0; 4];
 
         // test ogg magic and read page
         reader.read_exact(&mut ogg_magic)?;
-        if ogg_magic != [0x4f, 0x67, 0x67, 0x53] {
+        if &ogg_magic != b"OggS" {
             return Err(ParseError::InvalidOggPage);
         }
 
-        let mut buf = [0; 8];
-        let version = {
-            reader.read_exact(&mut buf[0..1])?;
-            buf[0]
-        };
-        let header_type = {
-            reader.read_exact(&mut buf[0..1])?;
-            buf[0]
-        };
-        let granule_position = i64::from_le_bytes({
-            reader.read_exact(&mut buf[0..8])?;
-            buf
-        });
-        let bitstream_serial_number = u32::from_le_bytes({
-            reader.read_exact(&mut buf[0..4])?;
-            [buf[0], buf[1], buf[2], buf[3]]
-        });
-        let page_sequence_number = u32::from_le_bytes({
-            reader.read_exact(&mut buf[0..4])?;
-            [buf[0], buf[1], buf[2], buf[3]]
-        });
-        let crc_checksum = u32::from_le_bytes({
-            reader.read_exact(&mut buf[0..4])?;
-            [buf[0], buf[1], buf[2], buf[3]]
-        });
-        let page_segments = {
-            reader.read_exact(&mut buf[0..1])?;
-            buf[0]
-        };
+        let version = reader.read_u8_le()?;
+        let header_type = reader.read_u8_le()?;
+        let granule_position = reader.read_i64_le()?;
+        let bitstream_serial_number = reader.read_u32_le()?;
+        let page_sequence_number = reader.read_u32_le()?;
+        let crc_checksum = reader.read_u32_le()?;
+        let page_segments = reader.read_u8_le()?;
         let mut segment_table_bytes = vec![0; page_segments as usize];
         let segment_table = {
             reader.read_exact(&mut segment_table_bytes)?;

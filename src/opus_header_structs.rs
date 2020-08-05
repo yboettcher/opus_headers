@@ -1,4 +1,5 @@
-use crate::parse_error::*;
+use crate::error::{ParseError, Result};
+use crate::read_ext::ReadExt;
 use std::collections::HashMap;
 use std::io::Read;
 use std::str;
@@ -33,40 +34,21 @@ pub struct CommentHeader {
 impl IdentificationHeader {
     /// Parses an identification header.
     /// Returns an err if anything goes wrong.
-    pub(crate) fn parse<T: Read>(mut reader: T) -> Result<IdentificationHeader, ParseError> {
+    pub(crate) fn parse<T: Read>(mut reader: T) -> Result<IdentificationHeader> {
         // check magic
         let mut opus_magic = [0; 8];
         reader.read_exact(&mut opus_magic)?;
-        if opus_magic != [0x4f, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64] {
+        if &opus_magic != b"OpusHead" {
             return Err(ParseError::InvalidOpusHeader);
         }
 
         // parse header
-        let mut buf = [0; 4];
-        let version = {
-            reader.read_exact(&mut buf[0..1])?;
-            buf[0]
-        };
-        let channel_count = {
-            reader.read_exact(&mut buf[0..1])?;
-            buf[0]
-        };
-        let pre_skip = u16::from_le_bytes({
-            reader.read_exact(&mut buf[0..2])?;
-            [buf[0], buf[1]]
-        });
-        let input_sample_rate = u32::from_le_bytes({
-            reader.read_exact(&mut buf)?;
-            buf
-        });
-        let output_gain = i16::from_le_bytes({
-            reader.read_exact(&mut buf[0..2])?;
-            [buf[0], buf[1]]
-        });
-        let channel_mapping_family = {
-            reader.read_exact(&mut buf[0..1])?;
-            buf[0]
-        };
+        let version = reader.read_u8_le()?;
+        let channel_count = reader.read_u8_le()?;
+        let pre_skip = reader.read_u16_le()?;
+        let input_sample_rate = reader.read_u32_le()?;
+        let output_gain = reader.read_i16_le()?;
+        let channel_mapping_family = reader.read_u8_le()?;
 
         let channel_mapping_table = if channel_mapping_family != 0 {
             Some(ChannelMappingTable::parse(&mut reader)?)
@@ -89,16 +71,9 @@ impl IdentificationHeader {
 impl ChannelMappingTable {
     /// parses a channel mapping table.
     /// returns an err if anything goes wrong.
-    pub(crate) fn parse<T: Read>(mut reader: T) -> Result<ChannelMappingTable, ParseError> {
-        let mut buf = [0; 1];
-        let stream_count = {
-            reader.read_exact(&mut buf)?;
-            buf[0]
-        };
-        let coupled_stream_count = {
-            reader.read_exact(&mut buf)?;
-            buf[0]
-        };
+    pub(crate) fn parse<T: Read>(mut reader: T) -> Result<ChannelMappingTable> {
+        let stream_count = reader.read_u8_le()?;
+        let coupled_stream_count = reader.read_u8_le()?;
         let mut channel_mapping = vec![0; stream_count as usize];
         reader.read_exact(&mut channel_mapping)?;
 
@@ -114,35 +89,24 @@ impl CommentHeader {
     /// parses the comment header.
     /// returns an err if anything goes wrong.
     /// if a comment cannot be split into two parts by splitting at '=', the comment is ignored
-    pub(crate) fn parse<T: Read>(mut reader: T) -> Result<CommentHeader, ParseError> {
+    pub(crate) fn parse<T: Read>(mut reader: T) -> Result<CommentHeader> {
         // check magic
         let mut opus_magic = [0; 8];
         reader.read_exact(&mut opus_magic)?;
-        if opus_magic != [0x4f, 0x70, 0x75, 0x73, 0x54, 0x61, 0x67, 0x73] {
+        if &opus_magic != b"OpusTags" {
             return Err(ParseError::InvalidOpusHeader);
         }
 
-        let mut buf = [0; 4];
-
-        let vlen = u32::from_le_bytes({
-            reader.read_exact(&mut buf)?;
-            buf
-        });
+        let vlen = reader.read_u32_le()?;
         let mut vstr_buffer = vec![0; vlen as usize];
         reader.read_exact(&mut vstr_buffer)?;
         let vstr = str::from_utf8(&vstr_buffer)?;
 
         let mut comments = HashMap::new();
-        let commentlistlen = u32::from_le_bytes({
-            reader.read_exact(&mut buf)?;
-            buf
-        });
+        let commentlistlen = reader.read_u32_le()?;
 
         for _i in 0..commentlistlen {
-            let commentlen = u32::from_le_bytes({
-                reader.read_exact(&mut buf)?;
-                buf
-            });
+            let commentlen = reader.read_u32_le()?;
             let mut comment_buffer = vec![0; commentlen as usize];
             reader.read_exact(&mut comment_buffer)?;
             let commentstr = str::from_utf8(&comment_buffer)?;

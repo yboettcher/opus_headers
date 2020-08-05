@@ -2,6 +2,10 @@ use std::error;
 use std::fmt;
 use std::io;
 use std::str;
+use std::result;
+
+/// A specialized [`Result`][std::result::Result] type for the fallible functions.
+pub type Result<T, E = ParseError> = result::Result<T, E>;
 
 /// A stream parsing error.
 #[derive(Debug)]
@@ -13,8 +17,8 @@ pub enum ParseError {
     Encoding(str::Utf8Error),
     /// The Ogg page was missing the `OggS` magic.
     InvalidOggPage,
-    /// The Opus headers were missing.
-    DidNotFindHeaders,
+    /// The Opus headers was missing its magic number.
+    InvalidOpusHeader,
 }
 
 impl From<io::Error> for ParseError {
@@ -35,7 +39,7 @@ impl error::Error for ParseError {
             ParseError::Io(e) => Some(e),
             ParseError::Encoding(e) => Some(e),
             ParseError::InvalidOggPage => None,
-            ParseError::DidNotFindHeaders => None,
+            ParseError::InvalidOpusHeader => None,
         }
     }
 }
@@ -46,7 +50,7 @@ impl fmt::Display for ParseError {
             ParseError::Io(e) => e.fmt(f),
             ParseError::Encoding(e) => e.fmt(f),
             ParseError::InvalidOggPage => f.write_str("missing Ogg page magic"),
-            ParseError::DidNotFindHeaders => f.write_str("missing Opus headers"),
+            ParseError::InvalidOpusHeader => f.write_str("Opus header is missing the magic signature"),
         }
     }
 }
