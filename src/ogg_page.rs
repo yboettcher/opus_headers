@@ -1,4 +1,3 @@
-use crate::opus_header_structs::*;
 use crate::parse_error::*;
 use std::io::Read;
 

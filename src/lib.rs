@@ -45,5 +45,5 @@ pub fn parse<T: Read>(mut reader: T) -> Result<OpusHeaders, ParseError> {
 
     let co = CommentHeader::parse(&comment_bytes[..])?;
 
-    return Ok(OpusHeaders { id, comments: co });
+    Ok(OpusHeaders { id, comments: co })
 }

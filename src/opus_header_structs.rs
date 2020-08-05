@@ -146,7 +146,7 @@ impl CommentHeader {
             let mut comment_buffer = vec![0; commentlen as usize];
             reader.read_exact(&mut comment_buffer)?;
             let commentstr = str::from_utf8(&comment_buffer)?;
-            let parts: Vec<_> = commentstr.splitn(2, "=").collect();
+            let parts: Vec<_> = commentstr.splitn(2, '=').collect();
             if parts.len() == 2 {
                 comments.insert(parts[0].to_string(), parts[1].to_string());
             } // else? malformed comment?
