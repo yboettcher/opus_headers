@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::error;
 use std::io::{self, Read};
 use std::str;
 
@@ -56,6 +57,27 @@ impl From<str::Utf8Error> for ParseError {
     }
 }
 
+impl error::Error for ParseError {
+    fn cause(&self) -> Option<&dyn error::Error> {
+        match self {
+            ParseError::Io(e) => Some(e),
+            ParseError::Encoding(e) => Some(e),
+            ParseError::InvalidOggPage => None,
+            ParseError::DidNotFindHeaders => None,
+        }
+    }
+}
+
+impl std::fmt::Display for ParseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ParseError::Io(e) => e.fmt(f),
+            ParseError::Encoding(e) => e.fmt(f),
+            ParseError::InvalidOggPage => f.write_str("missing Ogg page magic"),
+            ParseError::DidNotFindHeaders => f.write_str("missing Opus headers"),
+        }
+    }
+}
 struct OggPage {
     pub version: u8,
     pub header_type: u8,
