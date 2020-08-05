@@ -11,7 +11,7 @@ pub(crate) struct OggPage {
     pub crc_checksum: u32,
     pub page_segments: u8,
     pub segment_table: Vec<u8>, // contains the amount of bytes of payload: bytes = sum(segment_table_entries)
-    pub payload: Vec<u8>
+    pub payload: Vec<u8>,
 }
 
 impl OggPage {
@@ -61,9 +61,9 @@ impl OggPage {
 
         let total_segments = segment_table.iter().map(|&b| b as usize).sum();
         let mut payload = vec![0; total_segments];
-        
+
         reader.read_exact(&mut payload)?;
-        
+
         Ok(OggPage {
             version,
             header_type,
@@ -73,7 +73,7 @@ impl OggPage {
             crc_checksum,
             page_segments,
             segment_table,
-            payload
+            payload,
         })
     }
 }

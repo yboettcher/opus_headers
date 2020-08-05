@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::str;
-use std::io::Read;
 use crate::parse_error::*;
+use std::collections::HashMap;
+use std::io::Read;
+use std::str;
 
 /// The identification header.
 #[derive(Debug)]

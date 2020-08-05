@@ -19,4 +19,4 @@ impl From<str::Utf8Error> for ParseError {
     fn from(e: str::Utf8Error) -> Self {
         Self::Encoding(e)
     }
-} 
+}

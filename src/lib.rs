@@ -20,14 +20,13 @@ pub struct OpusHeaders {
 /// Either returns the Opus Headers, or an error if anything goes wrong.
 /// This should not panic.
 pub fn parse<T: Read>(mut reader: T) -> Result<OpusHeaders, ParseError> {
-    
     let first_ogg_page = OggPage::parse(&mut reader)?;
 
     let id = IdentificationHeader::parse(&first_ogg_page.payload[..])?;
-    
+
     let mut comment_pages = vec![];
     comment_pages.push(OggPage::parse(&mut reader)?);
-    
+
     // header 0x01 signals that the page is the continuation of a previous page
     loop {
         let next_page = OggPage::parse(&mut reader)?;
@@ -37,13 +36,13 @@ pub fn parse<T: Read>(mut reader: T) -> Result<OpusHeaders, ParseError> {
             break;
         }
     }
-    
+
     let mut comment_bytes: Vec<u8> = vec![];
-    
+
     for mut page in comment_pages {
         comment_bytes.append(&mut page.payload);
     }
-    
+
     let co = CommentHeader::parse(&comment_bytes[..])?;
 
     return Ok(OpusHeaders { id, comments: co });
