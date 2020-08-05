@@ -16,6 +16,9 @@ use opus_header_structs::*;
 mod ogg_page;
 use ogg_page::*;
 
+#[cfg(test)]
+mod tests;
+
 /// Both headers contained in an opus file.
 #[derive(Debug)]
 pub struct OpusHeaders {
@@ -23,7 +26,7 @@ pub struct OpusHeaders {
     pub comments: CommentHeader,
 }
 
-pub fn parse_from_path<P: AsRef<Path>>(path: &P) -> Result<OpusHeaders> {
+pub fn parse_from_path<P: AsRef<Path>>(path: P) -> Result<OpusHeaders> {
     parse_from_file(&File::open(path)?)
 }
 

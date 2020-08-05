@@ -1,6 +1,6 @@
 extern crate opus_headers;
 
-use opus_headers::parse;
+use opus_headers::parse_from_read;
 use std::fs::File;
 use std::io::BufReader;
 
@@ -12,6 +12,6 @@ fn main() {
     .unwrap();
     let mut reader = BufReader::new(f);
 
-    let headers = parse(&mut reader).unwrap();
+    let headers = parse_from_read(&mut reader).unwrap();
     println!("{:#?}", headers);
 }
