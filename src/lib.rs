@@ -82,21 +82,21 @@ pub fn parse<T: Read>(mut reader: T) -> Result<OpusHeaders, ParseError> {
 
     // test ogg magic and read first page
     reader.read_exact(&mut ogg_magic)?;
-    if ogg_magic != [0x4f, 0x67, 0x67, 0x53] {
+    if &ogg_magic != b"OggS" {
         return Err(ParseError::InvalidOggPage);
     }
     let first_ogg_page = parse_ogg_page(&mut reader)?;
 
     // test ogg magic and read second page
     reader.read_exact(&mut ogg_magic)?;
-    if ogg_magic != [0x4f, 0x67, 0x67, 0x53] {
+    if &ogg_magic != b"OggS" {
         return Err(ParseError::InvalidOggPage);
     }
     let second_ogg_page = parse_ogg_page(&mut reader)?;
 
     // test ogg magic after second page (sanity check)
     reader.read_exact(&mut ogg_magic)?;
-    if ogg_magic != [0x4f, 0x67, 0x67, 0x53] {
+    if &ogg_magic != b"OggS" {
         return Err(ParseError::InvalidOggPage);
     }
 
@@ -149,7 +149,7 @@ fn parse_ogg_page<T: Read>(mut reader: T) -> Result<OggPage, ParseError> {
     reader.read_exact(&mut opus_magic)?;
 
     // first packet, parse the identification header
-    if header_type == 0x02 && opus_magic == [0x4f, 0x70, 0x75, 0x73, 0x48, 0x65, 0x61, 0x64] {
+    if header_type == 0x02 && &opus_magic == b"OpusHead" {
         let identification_header = parse_identification_header(&mut reader)?;
         return Ok(OggPage {
             version,
@@ -165,7 +165,7 @@ fn parse_ogg_page<T: Read>(mut reader: T) -> Result<OggPage, ParseError> {
     }
 
     // not the first packet -> second packet, parse the comment header
-    if header_type == 0x00 && opus_magic == [0x4f, 0x70, 0x75, 0x73, 0x54, 0x61, 0x67, 0x73] {
+    if header_type == 0x00 && &opus_magic == b"OpusTags" {
         let comment_header = parse_comment_header(&mut reader)?;
         return Ok(OggPage {
             version,
