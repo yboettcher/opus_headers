@@ -3,7 +3,7 @@ name = "opus_headers"
 version = "0.1.0"
 authors = ["Yannik Böttcher <yannikboettcher@outlook.de>"]
 edition = "2018"
-license = "MIT"
+license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
