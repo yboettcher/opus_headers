@@ -11,7 +11,7 @@ mod error;
 mod read_ext;
 
 mod opus_header_structs;
-use opus_header_structs::*;
+pub use opus_header_structs::*;
 
 mod ogg_page;
 use ogg_page::*;
@@ -26,15 +26,21 @@ pub struct OpusHeaders {
     pub comments: CommentHeader,
 }
 
+/// Parses an opus file given by the path.
+/// Either returns the Opus Headers, or an error if anything goes wrong.
+/// This should not panic.
 pub fn parse_from_path<P: AsRef<Path>>(path: P) -> Result<OpusHeaders> {
     parse_from_file(&File::open(path)?)
 }
 
+/// Parses an opus file given by the file parameter.
+/// Either returns the Opus Headers, or an error if anything goes wrong.
+/// This should not panic.
 pub fn parse_from_file(file: &File) -> Result<OpusHeaders> {
     parse_from_read(BufReader::new(file))
 }
 
-/// Parses a file given by a reader.
+/// Parses an opus file given by a reader.
 /// Either returns the Opus Headers, or an error if anything goes wrong.
 /// This should not panic.
 pub fn parse_from_read<T: Read>(mut reader: T) -> Result<OpusHeaders> {
