@@ -6,7 +6,7 @@ use std::io::BufReader;
 
 fn main() {
     let f = File::open(format!(
-        "{}/examples/silence.opus",
+        "{}/examples/silence_with_long_comments.opus",
         env!("CARGO_MANIFEST_DIR")
     ))
     .unwrap();
