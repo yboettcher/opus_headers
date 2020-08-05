@@ -1,7 +1,6 @@
 # Opus Header Parsing Library
 
-Parsing of Opus Headers according to the [specification](https://tools.ietf.org/html/rfc7845#section-5)
-Simply supply anything that implements the std::io::Read trait to the parse function.
+Parsing of Opus Headers according to the [specification](https://tools.ietf.org/html/rfc7845#section-5).
 
 # Usage
 

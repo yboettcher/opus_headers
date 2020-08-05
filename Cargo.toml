@@ -4,6 +4,16 @@ version = "0.1.0"
 authors = ["Yannik Böttcher <yannikboettcher@outlook.de>"]
 edition = "2018"
 license = "MIT OR Apache-2.0"
+description = "Parsing the headers of opus files."
+repository = "https://github.com/zaethan/opus_headers"
+homepage = "https://github.com/zaethan/opus_headers"
+readme = "README.md"
+keywords = ["opus", "tags", "audio", "metadata", "parser"]
+categories = ["multimedia::audio"]
+exclude = [
+    "test/*",
+    "examples/*"
+]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
