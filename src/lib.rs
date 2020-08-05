@@ -1,7 +1,15 @@
 use std::io::Read;
+use std::result;
 
-mod parse_error;
-use parse_error::*;
+pub use error::ParseError;
+
+use read_ext::ReadExt;
+
+mod error;
+mod read_ext;
+
+/// A specialized [`Result`][std::result::Result] type for the fallible functions.
+pub type Result<T, E = ParseError> = result::Result<T, E>;
 
 mod opus_header_structs;
 use opus_header_structs::*;
