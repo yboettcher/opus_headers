@@ -3,6 +3,10 @@ use std::io::Read;
 pub use error::ParseError;
 pub use error::Result;
 
+use std::fs::File;
+use std::path::Path;
+use std::io::BufReader;
+
 mod error;
 mod read_ext;
 
@@ -19,10 +23,18 @@ pub struct OpusHeaders {
     pub comments: CommentHeader,
 }
 
+pub fn parse_from_path<P: AsRef<Path>>(path: &P) -> Result<OpusHeaders> {
+    parse_from_file(&File::open(path)?)
+}
+
+pub fn parse_from_file(file: &File) -> Result<OpusHeaders> {
+    parse_from_read(BufReader::new(file))
+}
+
 /// Parses a file given by a reader.
 /// Either returns the Opus Headers, or an error if anything goes wrong.
 /// This should not panic.
-pub fn parse<T: Read>(mut reader: T) -> Result<OpusHeaders> {
+pub fn parse_from_read<T: Read>(mut reader: T) -> Result<OpusHeaders> {
     let first_ogg_page = OggPage::parse(&mut reader)?;
 
     let id = IdentificationHeader::parse(&first_ogg_page.payload[..])?;
