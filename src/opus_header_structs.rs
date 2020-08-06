@@ -36,9 +36,7 @@ impl IdentificationHeader {
     /// Returns an err if anything goes wrong.
     pub(crate) fn parse<T: Read>(mut reader: T) -> Result<IdentificationHeader> {
         // check magic
-        let mut opus_magic = [0; 8];
-        reader.read_exact(&mut opus_magic)?;
-        if &opus_magic != b"OpusHead" {
+        if &reader.read_eight_bytes()? != b"OpusHead" {
             return Err(ParseError::InvalidOpusHeader);
         }
 
@@ -74,8 +72,7 @@ impl ChannelMappingTable {
     pub(crate) fn parse<T: Read>(mut reader: T) -> Result<ChannelMappingTable> {
         let stream_count = reader.read_u8_le()?;
         let coupled_stream_count = reader.read_u8_le()?;
-        let mut channel_mapping = vec![0; stream_count as usize];
-        reader.read_exact(&mut channel_mapping)?;
+        let channel_mapping = reader.read_byte_vec(stream_count as usize)?;
 
         Ok(ChannelMappingTable {
             stream_count,
@@ -91,25 +88,22 @@ impl CommentHeader {
     /// if a comment cannot be split into two parts by splitting at '=', the comment is ignored
     pub(crate) fn parse<T: Read>(mut reader: T) -> Result<CommentHeader> {
         // check magic
-        let mut opus_magic = [0; 8];
-        reader.read_exact(&mut opus_magic)?;
-        if &opus_magic != b"OpusTags" {
+        if &reader.read_eight_bytes()? != b"OpusTags" {
             return Err(ParseError::InvalidOpusHeader);
         }
 
         let vlen = reader.read_u32_le()?;
-        let mut vstr_buffer = vec![0; vlen as usize];
-        reader.read_exact(&mut vstr_buffer)?;
-        let vstr = str::from_utf8(&vstr_buffer)?;
+        let vstr_bytes = reader.read_byte_vec(vlen as usize)?;
+        let vstr = str::from_utf8(&vstr_bytes)?;
 
         let mut comments = HashMap::new();
         let commentlistlen = reader.read_u32_le()?;
 
         for _i in 0..commentlistlen {
             let commentlen = reader.read_u32_le()?;
-            let mut comment_buffer = vec![0; commentlen as usize];
-            reader.read_exact(&mut comment_buffer)?;
-            let commentstr = str::from_utf8(&comment_buffer)?;
+            let comment_bytes = reader.read_byte_vec(commentlen as usize)?;
+            let commentstr = str::from_utf8(&comment_bytes)?;
+            
             let parts: Vec<_> = commentstr.splitn(2, '=').collect();
             if parts.len() == 2 {
                 comments.insert(parts[0].to_string(), parts[1].to_string());

@@ -16,11 +16,8 @@ pub(crate) struct OggPage {
 
 impl OggPage {
     pub(crate) fn parse<T: Read>(mut reader: T) -> Result<OggPage> {
-        let mut ogg_magic = [0; 4];
-
         // test ogg magic and read page
-        reader.read_exact(&mut ogg_magic)?;
-        if &ogg_magic != b"OggS" {
+        if &reader.read_four_bytes()? != b"OggS" {
             return Err(ParseError::InvalidOggPage);
         }
 
@@ -31,16 +28,10 @@ impl OggPage {
         let page_sequence_number = reader.read_u32_le()?;
         let crc_checksum = reader.read_u32_le()?;
         let page_segments = reader.read_u8_le()?;
-        let mut segment_table_bytes = vec![0; page_segments as usize];
-        let segment_table = {
-            reader.read_exact(&mut segment_table_bytes)?;
-            segment_table_bytes
-        };
+        let segment_table = reader.read_byte_vec(page_segments as usize)?;
 
         let total_segments = segment_table.iter().map(|&b| b as usize).sum();
-        let mut payload = vec![0; total_segments];
-
-        reader.read_exact(&mut payload)?;
+        let payload = reader.read_byte_vec(total_segments)?;
 
         Ok(OggPage {
             version,

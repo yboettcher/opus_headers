@@ -9,6 +9,9 @@ pub trait ReadExt {
     fn read_i32_le(&mut self) -> Result<i32>;
     fn read_u64_le(&mut self) -> Result<u64>;
     fn read_i64_le(&mut self) -> Result<i64>;
+    fn read_byte_vec(&mut self, amount: usize) -> Result<Vec<u8>>;
+    fn read_four_bytes(&mut self) -> Result<[u8; 4]>;
+    fn read_eight_bytes(&mut self) -> Result<[u8; 8]>;
 }
 
 impl<T> ReadExt for T where T: Read {
@@ -58,5 +61,23 @@ impl<T> ReadExt for T where T: Read {
         let mut buf = [0; 8];
         self.read_exact(&mut buf)?;
         Ok(i64::from_le_bytes(buf))
+    }
+    
+    fn read_byte_vec(&mut self, amount: usize) -> Result<Vec<u8>> {
+        let mut buf = vec![0; amount];
+        self.read_exact(&mut buf)?;
+        Ok(buf)
+    }
+    
+    fn read_four_bytes(&mut self) -> Result<[u8; 4]> {
+        let mut buf = [0; 4];
+        self.read_exact(&mut buf)?;
+        Ok(buf)
+    }
+    
+    fn read_eight_bytes(&mut self) -> Result<[u8; 8]> {
+        let mut buf = [0; 8];
+        self.read_exact(&mut buf)?;
+        Ok(buf)
     }
 }
