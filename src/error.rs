@@ -19,6 +19,12 @@ pub enum ParseError {
     InvalidOggPage,
     /// The Opus headers was missing its magic number.
     InvalidOpusHeader,
+    /// The Comment Header exceeds 120MB.
+    CommentHeaderTooLarge,
+    /// Any String within the comment header claims to be larger than the header itself.
+    CommentTooLong,
+    /// An error occurred while counting the length of the comment header. This is should not happen and should be considered a bug in this librray.
+    LengthMismatch
 }
 
 impl From<io::Error> for ParseError {
@@ -38,8 +44,7 @@ impl error::Error for ParseError {
         match self {
             ParseError::Io(e) => Some(e),
             ParseError::Encoding(e) => Some(e),
-            ParseError::InvalidOggPage => None,
-            ParseError::InvalidOpusHeader => None,
+            _ => None
         }
     }
 }
@@ -51,6 +56,9 @@ impl fmt::Display for ParseError {
             ParseError::Encoding(e) => e.fmt(f),
             ParseError::InvalidOggPage => f.write_str("missing Ogg page magic"),
             ParseError::InvalidOpusHeader => f.write_str("Opus header is missing the magic signature"),
+            ParseError::CommentHeaderTooLarge => f.write_str("Opus comment header is larger than 120MB"),
+            ParseError::CommentTooLong => f.write_str("A comment claims to be longer than the Header itself"),
+            ParseError::LengthMismatch => f.write_str("The length of the comment header does not match the calculated length")
         }
     }
 }

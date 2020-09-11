@@ -62,7 +62,9 @@ impl<T> ReadExt for T where T: Read {
         self.read_exact(&mut buf)?;
         Ok(i64::from_le_bytes(buf))
     }
-    
+
+    // note that this function allocates the given amount of Bytes before actually reading anything.
+    // Thus, one needs to be careful to not exhaust the computers memory by passing a very large 'amount' parameter
     fn read_byte_vec(&mut self, amount: usize) -> Result<Vec<u8>> {
         let mut buf = vec![0; amount];
         self.read_exact(&mut buf)?;

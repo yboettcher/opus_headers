@@ -51,6 +51,8 @@ fn test_malformed_file_1() {
     panic!("this file should not be accepted");
 }
 
+// These are now covered by the logic implemented for the malicious oom file
+/*
 #[test]
 fn test_malformed_file_2() {
     let path = Path::new("test/silence_malformed_wrong_length_too_long.opus");
@@ -79,7 +81,7 @@ fn test_malformed_file_3() {
     
     panic!("this file should not be accepted");
 }
-
+*/
 
 #[test]
 fn test_non_existing_file() {
@@ -92,5 +94,19 @@ fn test_non_existing_file() {
     
     println!("{:#?}", headers.unwrap());
     
+    panic!("this file should not be accepted");
+}
+
+#[test]
+fn test_malicious_file() {
+    let path = Path::new("test/malicious_oom.opus");
+    let headers = parse_from_path(path);
+
+    if let Err(ParseError::CommentTooLong) = headers {
+        return;
+    }
+
+    println!("{:#?}", headers.unwrap());
+
     panic!("this file should not be accepted");
 }

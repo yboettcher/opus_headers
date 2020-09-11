@@ -28,9 +28,12 @@ impl OggPage {
         let page_sequence_number = reader.read_u32_le()?;
         let crc_checksum = reader.read_u32_le()?;
         let page_segments = reader.read_u8_le()?;
-        let segment_table = reader.read_byte_vec(page_segments as usize)?;
 
+        // max allocated space of the vec: 511 Bytes
+        let segment_table = reader.read_byte_vec(page_segments as usize)?;
+        
         let total_segments = segment_table.iter().map(|&b| b as usize).sum();
+        // max allocated space of the vec: 511 * 511 Bytes = 261121 Bytes which is about 261 kBytes
         let payload = reader.read_byte_vec(total_segments)?;
 
         Ok(OggPage {

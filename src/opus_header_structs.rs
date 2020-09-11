@@ -72,6 +72,7 @@ impl ChannelMappingTable {
     pub(crate) fn parse<T: Read>(mut reader: T) -> Result<ChannelMappingTable> {
         let stream_count = reader.read_u8_le()?;
         let coupled_stream_count = reader.read_u8_le()?;
+        // stream count is a u8 -> this allocates 511 Bytes max
         let channel_mapping = reader.read_byte_vec(stream_count as usize)?;
 
         Ok(ChannelMappingTable {
@@ -86,23 +87,38 @@ impl CommentHeader {
     /// parses the comment header.
     /// returns an err if anything goes wrong.
     /// if a comment cannot be split into two parts by splitting at '=', the comment is ignored
-    pub(crate) fn parse<T: Read>(mut reader: T) -> Result<CommentHeader> {
+    pub(crate) fn parse<T: Read>(mut reader: T, header_len: u32) -> Result<CommentHeader> {
+        let mut remaining_bytes = header_len;
         // check magic
         if &reader.read_eight_bytes()? != b"OpusTags" {
             return Err(ParseError::InvalidOpusHeader);
         }
+        remaining_bytes -= 8;
 
         let vlen = reader.read_u32_le()?;
+        remaining_bytes -= 4;
+
+        if remaining_bytes < vlen {
+            return Err(ParseError::CommentTooLong);
+        }
         let vstr_bytes = reader.read_byte_vec(vlen as usize)?;
         let vstr = str::from_utf8(&vstr_bytes)?;
-
+        remaining_bytes -= vlen;
+        
         let mut comments = HashMap::new();
         let commentlistlen = reader.read_u32_le()?;
-
+        remaining_bytes -= 4;
+        
         for _i in 0..commentlistlen {
             let commentlen = reader.read_u32_le()?;
+            remaining_bytes -= 4;
+            
+            if remaining_bytes < commentlen {
+                return Err(ParseError::CommentTooLong);
+            }
             let comment_bytes = reader.read_byte_vec(commentlen as usize)?;
             let commentstr = str::from_utf8(&comment_bytes)?;
+            remaining_bytes -= commentlen;
             
             let parts: Vec<_> = commentstr.splitn(2, '=').collect();
             if parts.len() == 2 {
