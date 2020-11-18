@@ -110,3 +110,4 @@ fn test_malicious_file() {
 
     panic!("this file should not be accepted");
 }
+

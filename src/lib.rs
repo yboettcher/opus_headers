@@ -10,11 +10,14 @@ use std::io::BufReader;
 mod error;
 mod read_ext;
 
+mod opus_packets;
+
 mod opus_header_structs;
 pub use opus_header_structs::*;
 
 mod ogg_page;
 use ogg_page::*;
+use opus_packets::OpusPackets;
 
 #[cfg(test)]
 mod tests;
@@ -89,4 +92,48 @@ pub fn parse_from_read<T: Read>(mut reader: T) -> Result<OpusHeaders> {
     let co = CommentHeader::parse(&comment_bytes[..], comment_len as u32)?;
 
     Ok(OpusHeaders { id, comments: co })
+}
+
+/// Parses an opus file given by the path.
+/// Either returns the Opus Packets, or an error if anything goes wrong.
+/// This should not panic.
+pub fn get_opus_packets_from_path<P: AsRef<Path>>(path: P) -> Result<OpusPackets> {
+    get_opus_payload_from_file(&File::open(path)?)
+}
+
+/// Parses an opus file given by the file parameter.
+/// Either returns the Opus Packets, or an error if anything goes wrong.
+/// This should not panic.
+pub fn get_opus_payload_from_file(file: &File) -> Result<OpusPackets> {
+    get_opus_payload_from_read(BufReader::new(file))
+}
+
+/// Parses an opus file given by a reader.
+/// Either returns the Opus Packets, or an error if anything goes wrong.
+/// This should not panic.
+pub fn get_opus_payload_from_read<T: Read>(mut reader: T) -> Result<OpusPackets> {
+
+    // parse and ignore the id header page. used to advance the reader
+    let _first_ogg_page = OggPage::parse(&mut reader)?;
+    // parse and ignore the comment header
+    let _comment_ogg_page = OggPage::parse(&mut reader)?;
+
+    // exhaust comment pages
+    let first_opus_page = loop {
+        let next_page = OggPage::parse(&mut reader)?;
+        
+        // if this bit is 0, we finished the comment header and next_page is the first page containing actual opus data
+        if next_page.header_type & 0x2 == 0 {
+            break next_page;
+        }
+
+        // if the stream ends without any data, return the empty data
+        if next_page.header_type & 0x4 == 0 {
+            return Ok(OpusPackets::default());
+        }
+    };
+
+    let opus_packets = OpusPackets::parse(&mut reader, first_opus_page)?;
+
+    Ok(opus_packets)
 }
