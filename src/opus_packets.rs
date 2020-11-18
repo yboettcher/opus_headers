@@ -2,9 +2,9 @@ use std::io::Read;
 use crate::ogg_page::OggPage;
 use crate::error::Result;
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct OpusPackets(pub Vec<OpusPacket>);
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct OpusPacket(pub Vec<u8>);
 
 impl OpusPacket {
