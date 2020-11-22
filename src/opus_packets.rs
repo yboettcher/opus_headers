@@ -20,8 +20,9 @@ impl OpusPacket {
 		while continue_reading {
 			let next_page = OggPage::parse(&mut reader)?;
 
+			
 			let is_relevant = next_page.header_type & 0x1 == 1;
-			let is_last = next_page.header_type & 0x4 == 0;
+			let is_last = next_page.header_type & 0x4 == 1;
 			continue_reading = is_relevant && !is_last;
 
 			if is_relevant {
