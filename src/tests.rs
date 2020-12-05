@@ -115,39 +115,3 @@ fn test_malicious_file() {
     panic!("this file should not be accepted");
 }
 */
-
-/*
-#[test]
-fn test_simple_opus_packets() {
-    let path = Path::new("test/silence_standard.opus");
-    let packets = get_opus_packets_from_path(path);
-
-    // this should yield valid packet data
-    let packets = packets.unwrap();
-
-    // inspecting the file with a hex editor shows, that the packet data of silence is an always repeating pattern of 248,255,254.
-    // Thus, check whether we actually got the correct data
-    for packet in packets.iter() {
-        packet.0.iter().zip(Idx::default())
-            .for_each(|(&byte, reference)| assert!(byte == reference));
-    }
-}
-
-const PATTERN: [u8; 3] = [248, 255, 254];
-
-// helper to verify the packets of silent audio
-// repeatedly outputs 248, 255, 254
-#[derive(Default)]
-struct Idx(pub usize);
-
-impl Iterator for Idx {
-    type Item = u8;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let item = PATTERN[self.0];
-        self.0 += 1;
-        self.0 %= 3;
-        Some(item)
-    }
-}
-*/
