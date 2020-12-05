@@ -15,8 +15,10 @@ pub enum ParseError {
     Io(io::Error),
     /// A string decoding error occurred.
     Encoding(str::Utf8Error),
-    /// The Ogg page was missing the `OggS` magic.
-    InvalidOggPage,
+    /// An error occurred in the ogg::PacketReader
+    Ogg(ogg::OggReadError),
+    /// The Stream ended unexpectedly
+    UnexpectedEndOfStream,
     /// The Opus headers was missing its magic number.
     InvalidOpusHeader,
     /// The Comment Header exceeds 120MB.
@@ -39,11 +41,18 @@ impl From<str::Utf8Error> for ParseError {
     }
 }
 
+impl From<ogg::OggReadError> for ParseError {
+    fn from(e: ogg::OggReadError) -> Self {
+        Self::Ogg(e)
+    }
+}
+
 impl error::Error for ParseError {
     fn cause(&self) -> Option<&dyn error::Error> {
         match self {
             ParseError::Io(e) => Some(e),
             ParseError::Encoding(e) => Some(e),
+            ParseError::Ogg(e) => Some(e),
             _ => None
         }
     }
@@ -54,7 +63,8 @@ impl fmt::Display for ParseError {
         match self {
             ParseError::Io(e) => e.fmt(f),
             ParseError::Encoding(e) => e.fmt(f),
-            ParseError::InvalidOggPage => f.write_str("missing Ogg page magic"),
+            ParseError::Ogg(e) => e.fmt(f),
+            ParseError::UnexpectedEndOfStream => f.write_str("The stream ended before the necessary data could be extracted"),
             ParseError::InvalidOpusHeader => f.write_str("Opus header is missing the magic signature"),
             ParseError::CommentHeaderTooLarge => f.write_str("Opus comment header is larger than 120MB"),
             ParseError::CommentTooLong => f.write_str("A comment claims to be longer than the Header itself"),

@@ -18,7 +18,8 @@ impl OggPage {
     pub(crate) fn parse<T: Read>(mut reader: T) -> Result<OggPage> {
         // test ogg magic and read page
         if &reader.read_four_bytes()? != b"OggS" {
-            return Err(ParseError::InvalidOggPage);
+            panic!("this code shall be removed");
+            // return Err(ParseError::InvalidOggPage);
         }
 
         let version = reader.read_u8_le()?;
