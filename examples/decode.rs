@@ -7,8 +7,9 @@ use audiopus::{SampleRate, Channels};
 // to write the decoded samples into a wav
 use hound::{WavSpec, WavWriter};
 
-fn main() {
+// This example works well with mono audio.
 
+fn main() {
 	let args: Vec<String> = std::env::args().skip(1).collect();
 
 	if 2 != args.len() {
