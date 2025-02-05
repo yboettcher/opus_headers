@@ -1,6 +1,5 @@
 use crate::error::{ParseError, Result};
 use crate::read_ext::ReadExt;
-use std::collections::HashMap;
 use std::io::Read;
 use std::str;
 
@@ -24,11 +23,11 @@ pub struct ChannelMappingTable {
     pub channel_mapping: Vec<u8>,
 }
 
-/// The Comment header containing a vendor string and the user comments as a map.
+/// The Comment header containing a vendor string and the user comments as a vec.
 #[derive(Debug)]
 pub struct CommentHeader {
     pub vendor: String,
-    pub user_comments: HashMap<String, String>,
+    pub user_comments: Vec<(String, String)>,
 }
 
 impl IdentificationHeader {
@@ -104,25 +103,25 @@ impl CommentHeader {
         let vstr_bytes = reader.read_byte_vec(vlen as usize)?;
         let vstr = str::from_utf8(&vstr_bytes)?;
         remaining_bytes -= vlen;
-        
-        let mut comments = HashMap::new();
+
+        let mut comments = Vec::new();
         let commentlistlen = reader.read_u32_le()?;
         remaining_bytes -= 4;
-        
+
         for _i in 0..commentlistlen {
             let commentlen = reader.read_u32_le()?;
             remaining_bytes -= 4;
-            
+
             if remaining_bytes < commentlen {
                 return Err(ParseError::CommentTooLong);
             }
             let comment_bytes = reader.read_byte_vec(commentlen as usize)?;
             let commentstr = str::from_utf8(&comment_bytes)?;
             remaining_bytes -= commentlen;
-            
+
             let parts: Vec<_> = commentstr.splitn(2, '=').collect();
             if parts.len() == 2 {
-                comments.insert(parts[0].to_string(), parts[1].to_string());
+                comments.push((parts[0].to_string(), parts[1].to_string()));
             } // else? malformed comment?
         }
 
@@ -130,5 +129,27 @@ impl CommentHeader {
             vendor: vstr.to_string(),
             user_comments: comments,
         })
+    }
+
+    /// returns the first user comment value with the specified name (eg. "ARTIST")
+    pub fn get_value(&self, key: &str) -> Option<&str> {
+        self.user_comments
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
+    }
+
+    /// returns all user comment values with the specified name (eg. "ARTIST")
+    pub fn get_values(&self, key: &str) -> Option<Vec<&str>> {
+        let values = self
+            .user_comments
+            .iter()
+            .filter(|(k, _)| k == key)
+            .map(|(_, v)| v.as_str())
+            .collect::<Vec<_>>();
+        match values.is_empty() {
+            true => None,
+            false => Some(values),
+        }
     }
 }
